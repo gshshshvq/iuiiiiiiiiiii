@@ -1,26 +1,76 @@
-import telebot
-from telebot import types
-import requests , re
+from pyrogram import Client,filters
+from pyrogram.errors import SessionPasswordNeeded,PhoneCodeExpired
+from pyrogram.errors.exceptions.bad_request_400 import PasswordHashInvalid,PhoneCodeInvalid
+from pyrogram.errors.exceptions.not_acceptable_406 import PhoneNumberInvalid
+from pyromod import listen
 
-token = "6074459931:AAH53z3kyGDeANmTSIS_DpJibvHEIIHD1M8"
-channel = types.InlineKeyboardButton(text='قـنـاة الـبـوت',url='t.me/BOTS22i')
-bot = telebot.TeleBot(token)
-@bot.message_handler(commands=["start"])
-def welcome(message):
-	name = message.from_user.first_name
-	brok = types.InlineKeyboardMarkup()
-	brok.add(channel)
-	bot.reply_to(message,'اهلا {} ارسل رابط لاختصاره'.format(name),reply_markup=brok)
-	
-@bot.message_handler(func=lambda m:True)
-def shorturl(message):
-	msg = message.text
-	url = f'https://is.gd/create.php?format=simple&url={msg}'
-	req = requests.get(url).text
-	if re.search("(?P<url>https?://[^\s]+)", msg):
-		bot.reply_to(message,f'تم الاختصار: \n{req}')
-	else:
-		bot.reply_to(message, "sorry ,This is not a link URL")
-	
-print('تم التشغيل')
-bot.infinity_polling()
+
+API_ID = 14170449
+API_HASH = "03488b3c030fe095667e7ca22fe34954"
+TOKEN = "6223681267:AAETmac4Jyo_0DLhwbZMOSsFXSeeUAQ5hBY"
+
+app = Client("Session",api_id=API_ID,api_hash=API_HASH,bot_token=TOKEN, in_memory=True)
+
+
+@app.on_message(filters.command("start"))
+async def Send(app,msg):
+  c = Client("Pyrogram",
+  API_ID,API_HASH,
+  device_model="Paddington3",
+  in_memory=True)
+  await c.connect()
+  a = msg.text
+  msg = await app.ask(msg.chat.id,f"يا {msg.from_user.mention} ارسل رقمك الان \n مثال : +20112801111",filters=filters.text)
+  Number = msg.text
+  
+  try:
+  	send = await c.send_code(Number)
+  except PhoneNumberInvalid:
+  	return await msg.reply("الرقم الذي ارسلته خاطئ",quote=True)
+  except Exception:
+         return await msg.reply("حدث خطا حاول مره اخري",quote=True)
+  	
+  SendCode = send.phone_code_hash
+  code = await app.ask(msg.chat.id,f"يا {msg.from_user.mention} ارسل الان كود التحقق \n مثال : `1 2 3 4 5 6`",filters=filters.text)
+  
+  RecepionCode = code.text
+  
+  try:
+  	await c.sign_in(Number,SendCode,RecepionCode)
+  except SessionPasswordNeeded:
+  	Password = await app.ask(msg.chat.id,f"يا {msg.from_user.mention} ارسل الان كود التحقق بخطوتين",filters=filters.text)
+  	
+  	PasswordAss = Password.text
+  try:
+  	await c.check_password(password=PasswordAss)
+  except PasswordHashInvalid:
+  	return await Password.reply("الباسورد خطأ",quote=True)
+  except (PhoneCodeInvalid, PhoneCodeExpired):
+    return await code.reply("الكود خطأ",quote=True)
+         
+  try:
+  	await c.sign_in(Number,SendCode,RecepionCode)
+  except:
+  	pass
+  
+  a = await msg.reply("انتظر قليلا",quote=True)
+  
+  get = await c.get_me()
+  text = "||**معلومات عنك**|| :\n\n"
+  text += f"**اسمك الاول **: {get.first_name}\n"
+  text += f"**ايديك **: {get.id}\n"
+  text += f"**رقمك** : {Number}\n"
+  text += f"\n\n شاهد الرسائل المحفوظه [{get.first_name}](tg://openmessage?user_id={get.id})\n"
+  text += "للاستخراج مره اخر اضغط /start"
+  
+  Session = await c.export_session_string()
+  await a.delete()
+  
+  await c.send_message("me",text=f"الجلسه الخاصه بك : \n\n||`{Session}`||\n\nلا تشارك هذا الكود مع احد \n معلومات عن المطور : @N0040")
+  
+  await c.disconnect()
+  
+  await app.send_message(msg.chat.id,text)
+  
+print("تـم تـشـغـيـل")
+app.run()
